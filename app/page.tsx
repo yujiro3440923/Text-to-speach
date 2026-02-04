@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-// ↓ ここに 'Clock' を追加しました
 import { Upload, FileText, ArrowRight, ArrowLeft, Wand2, Check, History, Settings, FileUp, X, Download, Volume2, LogOut, User, Gauge, Zap, Play, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -389,6 +388,30 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* 文字数ステータス (Step 1用 - ここに追加しました) */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white p-2 rounded-lg text-indigo-600 shadow-sm">
+                      <Gauge size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase">文字数ステータス</p>
+                      <p className="text-sm font-bold text-gray-900">
+                        現在: <span className="text-indigo-600 text-lg">{inputText.length}</span> 文字 
+                        <span className="mx-2 text-gray-300">|</span> 
+                        目標目安: {Math.floor(seconds * CHARS_PER_SEC)} 文字
+                      </p>
+                    </div>
+                  </div>
+                  <div className={`px-4 py-2 rounded-lg font-bold text-xs md:text-sm flex items-center gap-2 ${diffCount < 0 ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                     {diffCount === 0 ? <Check size={16} /> : <Zap size={16} />}
+                     {diffCount === 0 ? 'ピッタリです！' : diffCount > 0 
+                      ? `あと ${diffCount} 文字足りません` 
+                      : `${Math.abs(diffCount)} 文字多いです`
+                    }
+                  </div>
+                </div>
+
                 <button onClick={handleGoToPreview} className="w-full py-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold flex justify-center items-center gap-2 shadow-lg hover:shadow-xl transition-all">
                   処理を開始する <ArrowRight size={18} />
                 </button>
@@ -401,7 +424,7 @@ export default function Home() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in-up">
               <div className="p-6 sm:p-8 space-y-8">
                 
-                {/* 文字数ステータスバー */}
+                {/* 文字数ステータスバー (Step 2でも表示) */}
                 <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600">
