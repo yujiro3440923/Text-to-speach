@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Upload, FileText, ArrowRight, ArrowLeft, Wand2, Check, History, Settings, FileUp, X, Download, Volume2, LogOut, User, Gauge, Zap, Play } from 'lucide-react';
+// ↓ ここに 'Clock' を追加しました
+import { Upload, FileText, ArrowRight, ArrowLeft, Wand2, Check, History, Settings, FileUp, X, Download, Volume2, LogOut, User, Gauge, Zap, Play, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
