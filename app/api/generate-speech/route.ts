@@ -5,9 +5,9 @@ const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000000';
 
 export async function POST(request: Request) {
   try {
-    const { text, voiceName } = await request.json();
+    // speakingRate (速度) を受け取るように追加
+    const { text, voiceName, speakingRate } = await request.json();
 
-    // 1. SupabaseからGoogle APIキーを取得
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -20,13 +20,10 @@ export async function POST(request: Request) {
       .single();
 
     if (dbError || !orgData?.google_api_key) {
-      return NextResponse.json({ error: '設定画面でGoogle APIキーが設定されていません。' }, { status: 400 });
+      return NextResponse.json({ error: 'Google APIキーが設定されていません。' }, { status: 400 });
     }
 
-    // 余計な空白を除去
     const apiKey = orgData.google_api_key.trim();
-
-    // 2. 取得したキーを使ってリクエスト
     const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
     const body = {
@@ -35,7 +32,11 @@ export async function POST(request: Request) {
         languageCode: 'ja-JP', 
         name: voiceName || 'ja-JP-Neural2-B'
       },
-      audioConfig: { audioEncoding: 'MP3' },
+      audioConfig: { 
+        audioEncoding: 'MP3',
+        // 速度設定: 0.25 〜 4.0。 1.0が標準。
+        speakingRate: speakingRate || 1.0 
+      },
     };
 
     const response = await fetch(url, {
@@ -47,7 +48,6 @@ export async function POST(request: Request) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Google API Error:", data);
       throw new Error(data.error?.message || 'Google API Error');
     }
 
