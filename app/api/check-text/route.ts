@@ -2,14 +2,12 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
-// デモ用ID
 const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000000';
 
 export async function POST(request: Request) {
   try {
     const { text, seconds } = await request.json();
 
-    // SupabaseからAPIキー取得
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,19 +27,18 @@ export async function POST(request: Request) {
       apiKey: orgData.openai_api_key,
     });
 
-    // ★ ここをご提供いただいた画像のプロンプトに変更しました
     const systemPrompt = `
 あなたはプロのラジオ放送原稿ライターです。
 与えられた原稿を指定された秒数でちょうど読み終わるように調整してください。
 
-ルール:
-1. 日本語の読み上げ速度は1秒あたり約5-6文字が目安
-2. 原稿の意味や雰囲気を損なわないこと
-3. 自然な言い回しを保つこと
-4. 句読点やポーズを活用して微調整
+# 厳守ルール:
+1. 出力は「修正後の原稿テキストのみ」を行ってください。「調整しました」「以下が原稿です」などの前置きや挨拶は一切禁止です。
+2. 記号（---など）も不要です。
+3. 日本語の読み上げ速度は1秒あたり約5.5文字を目安にしてください。
+4. 原稿の意味や雰囲気を損なわないこと。
+5. 自然な言い回しを保つこと。
     `;
 
-    // ユーザーへの指示: 秒数を明示
     const userContent = `
 以下の原稿を、${seconds}秒程度で読み終わるように調整してください。
 
@@ -57,7 +54,8 @@ ${text}
       ],
     });
 
-    const revisedText = completion.choices[0].message.content;
+    // 余計な空白や改行を削除して返す
+    const revisedText = completion.choices[0].message.content?.trim();
 
     return NextResponse.json({ result: revisedText });
 
