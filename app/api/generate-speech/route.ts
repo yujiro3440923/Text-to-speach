@@ -1,17 +1,32 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000000';
 
 export async function POST(request: Request) {
   try {
     const { text, voiceName } = await request.json();
-    // 余計な空白が入らないように .trim() で掃除
-    const apiKey = process.env.GOOGLE_API_KEY?.trim();
 
-    if (!apiKey) {
-      return NextResponse.json({ error: 'API Key is missing' }, { status: 500 });
+    // 1. SupabaseからGoogle APIキーを取得
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const { data: orgData, error: dbError } = await supabase
+      .from('organizations')
+      .select('google_api_key')
+      .eq('id', DEMO_ORG_ID)
+      .single();
+
+    if (dbError || !orgData?.google_api_key) {
+      return NextResponse.json({ error: '設定画面でGoogle APIキーが設定されていません。' }, { status: 400 });
     }
 
-    // ★修正点: APIキーをURLの後ろに「?key=...」という形でつけます。
-    // これが最も標準的でエラーが出にくい方法です。
+    // 余計な空白を除去
+    const apiKey = orgData.google_api_key.trim();
+
+    // 2. 取得したキーを使ってリクエスト
     const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
     const body = {
@@ -25,9 +40,7 @@ export async function POST(request: Request) {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
