@@ -46,6 +46,11 @@ export async function POST(request: Request) {
     // Generate at standard 1.0x speed to measure "natural" duration
 
     let ssmlInput = inputContent;
+    // Simple sanitization: Strip non-SSML tags if possible? 
+    // For now, let's just ensure <speak> wrap.
+    // Also strip generic <span> or <div> if they don't have ssml attributes, but that's hard with regex.
+    // Let's rely on frontend sending mostly clean HTML, but ensure <speak>.
+
     if (!ssmlInput.includes('<speak>')) {
       ssmlInput = `<speak>${ssmlInput}</speak>`;
     }
@@ -76,53 +81,59 @@ export async function POST(request: Request) {
 
     const data1 = await res1.json();
     const buffer1 = Buffer.from(data1.audioContent, 'base64');
-    const naturalDuration = await getAudioDuration(buffer1);
 
-    // --- Calculate Correction ---
-    // naturalDuration (at 1.0x) / targetSeconds = Required Rate
-    // Example: Natural 20s / Target 10s = Rate 2.0x
-    // Example: Natural 10s / Target 20s = Rate 0.5x
-
-    let adjustedRate = naturalDuration / parseFloat(targetSeconds);
-
-    // Clamp for API limits (0.25 - 4.0)
-    if (adjustedRate < 0.25) adjustedRate = 0.25;
-    if (adjustedRate > 4.0) adjustedRate = 4.0;
-
-    // Round to 2 decimals
-    adjustedRate = Math.round(adjustedRate * 100) / 100;
-
-    console.log(`[Two-Pass] Natural: ${naturalDuration}s, Target: ${targetSeconds}s, New Rate: ${adjustedRate}`);
-
+    let naturalDuration = 0;
     let finalAudioContent = data1.audioContent;
     let finalRate = 1.0;
 
-    // Google TTS rate deviation needs correction?
-    // If rate is effectively 1.0 (within margin), we can skip.
-    if (Math.abs(adjustedRate - 1.0) > 0.05) {
-      // --- PASS 2: Generation with Corrected Rate ---
-      const bodyPass2 = {
-        ...bodyPass1,
-        audioConfig: {
-          ...bodyPass1.audioConfig,
-          speakingRate: adjustedRate
+    // Safety Wrap for Duration & 2nd Pass
+    try {
+      naturalDuration = await getAudioDuration(buffer1);
+      console.log(`[Two-Pass] Natural Duration: ${naturalDuration}s`);
+
+      // --- Calculate Correction ---
+      let adjustedRate = naturalDuration / parseFloat(targetSeconds);
+
+      // Clamp for API limits (0.25 - 4.0)
+      if (adjustedRate < 0.25) adjustedRate = 0.25;
+      if (adjustedRate > 4.0) adjustedRate = 4.0;
+
+      adjustedRate = Math.round(adjustedRate * 100) / 100;
+
+      console.log(`[Two-Pass] Target: ${targetSeconds}s, New Rate: ${adjustedRate}`);
+
+      // Google TTS rate deviation needs correction?
+      // If rate is effectively 1.0 (within margin), we can skip.
+      if (Math.abs(adjustedRate - 1.0) > 0.05) {
+        // --- PASS 2: Generation with Corrected Rate ---
+        const bodyPass2 = {
+          ...bodyPass1,
+          audioConfig: {
+            ...bodyPass1.audioConfig,
+            speakingRate: adjustedRate
+          }
+        };
+
+        const res2 = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPass2),
+        });
+
+        if (!res2.ok) {
+          // If Pass 2 fails, log it but return Pass 1 (better than nothing)
+          const err = await res2.json();
+          console.error('Google API Error (Pass 2):', err);
+        } else {
+          const data2 = await res2.json();
+          finalAudioContent = data2.audioContent;
+          finalRate = adjustedRate;
         }
-      };
-
-      const res2 = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPass2),
-      });
-
-      if (!res2.ok) {
-        const err = await res2.json();
-        throw new Error(err.error?.message || 'Google API Error (Pass 2)');
       }
-
-      const data2 = await res2.json();
-      finalAudioContent = data2.audioContent;
-      finalRate = adjustedRate;
+    } catch (innerError) {
+      console.error('Two-Pass Optimization Failed (Falling back to 1.0x):', innerError);
+      // Fallback: naturalDuration might be 0, calculatedRate 1.0
+      // We still return the audio from Pass 1.
     }
 
     return NextResponse.json({

@@ -69,10 +69,25 @@ export const VisualScriptEditor = ({ initialContent, onChange, className }: Visu
             // So I will post-process the HTML string to convert the spans to breaks.
 
             // Replaces specific spans with break tags
-            // Class: ssml-break-render
-            // Tag: <span class="ssml-break-render" time="0.5s"></span> -> <break time="0.5s" />
+            // We look for spans with class "ssml-break-render" and capture the "time" attribute value.
+            // Regex explanation:
+            // <span (any chars) class="ssml-break-render" (any chars) time="([^"]+)" (any chars) > (content) </span>
+            // OR time comes first.
 
-            html = html.replace(/<span class="ssml-break-render"[^>]*time="([^"]+)"[^>]*><\/span>/g, '<break time="$1" />');
+            // Easier strategy: Match the span tag open, check for class, extract time.
+            // But JS regex is simplest with a robust pattern.
+            // Pattern: <span[^>]*class="ssml-break-render"[^>]*time="([^"]+)"[^>]*><\/span> 
+            // This assumes class comes before time. 
+            // Let's use a two-step replace or a function replacer.
+
+            // Let's match the whole block.
+            html = html.replace(/<span[^>]*class="ssml-break-render"[^>]*>.*?<\/span>/g, (match) => {
+                const timeMatch = match.match(/time=["']([^"']+)["']/);
+                if (timeMatch) {
+                    return `<break time="${timeMatch[1]}" />`;
+                }
+                return match;
+            });
 
             // Emphasis: <emphasis class="ssml-emphasis">text</emphasis> -> <emphasis>text</emphasis>
             // The class attribute is harmless but we can remove it.
