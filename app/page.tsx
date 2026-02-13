@@ -12,7 +12,9 @@ import * as XLSX from 'xlsx';
 import { TimePicker } from '@/components/TimePicker';
 import { StatusPanel } from '@/components/StatusPanel';
 import { PitchSlider } from '@/components/PitchSlider';
-import { EditorToolbar } from '@/components/EditorToolbar';
+// import { EditorToolbar } from '@/components/EditorToolbar'; // Removed
+import { VisualScriptEditor } from '@/components/editor/VisualScriptEditor';
+
 
 export default function Home() {
   const router = useRouter();
@@ -362,29 +364,30 @@ export default function Home() {
 
                 <StatusPanel currentText={currentText} targetSeconds={seconds} />
 
-                {/* Editor Toolbar */}
-                <div className="flex justify-end">
-                  <EditorToolbar onInsert={handleInsertTag} />
-                </div>
+
+                {/* Editor Toolbar (Moved to Visual Editor) */}
+                {/* <div className="flex justify-end">
+                    <EditorToolbar onInsert={handleInsertTag} />
+                </div> */}
 
                 {/* 2-Column Editor */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]">
 
-                  {/* Left: Original */}
+                  {/* Left: Original (Visual Editor) */}
                   <div onClick={() => setSelectedTextSource('original')} className={`flex flex-col h-full border-2 rounded-xl overflow-hidden transition-all ${selectedTextSource === 'original' ? 'border-gray-900 ring-2 ring-gray-100' : 'border-gray-200 opacity-60 hover:opacity-100'}`}>
                     <div className="bg-gray-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                       <span className="font-bold text-gray-700 text-xs tracking-wider flex items-center gap-2">
-                        <Type size={14} /> ORIGINAL SCRIPT
+                        <Type size={14} /> VISUAL DIRECTOR
                       </span>
                       {selectedTextSource === 'original' && <Check size={16} className="text-gray-900" />}
                     </div>
-                    <textarea
-                      name="original"
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      className="flex-1 w-full p-4 resize-none focus:outline-none text-base text-gray-800 bg-white font-mono"
-                      placeholder="原稿..."
-                    />
+                    <div className="flex-1 bg-white overflow-hidden flex flex-col">
+                      <VisualScriptEditor
+                        initialContent={inputText}
+                        onChange={setInputText}
+                        className="h-full border-none rounded-none"
+                      />
+                    </div>
                   </div>
 
                   {/* Right: AI */}
