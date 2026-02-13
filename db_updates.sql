@@ -12,3 +12,5 @@ ADD COLUMN IF NOT EXISTS settings_password text DEFAULT '1234';
 -- 3. Comment on columns
 COMMENT ON COLUMN organizations.openai_api_key IS 'User provided OpenAI API Key. Overrides Env var.';
 COMMENT ON COLUMN organizations.settings_password IS 'Password to access the Settings page.';
+
+-- Updated at 2026-02-13 15:35
