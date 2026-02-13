@@ -3,7 +3,8 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { PauseExtension } from './PauseExtension';
 import { EmphasisExtension } from './EmphasisExtension';
-import { Bold, PauseCircle, Type } from 'lucide-react';
+import { ProsodyExtension } from './ProsodyExtension';
+import { Bold, PauseCircle, Type, X } from 'lucide-react';
 
 type VisualScriptEditorProps = {
     initialContent: string;
@@ -24,6 +25,7 @@ export const VisualScriptEditor = ({ initialContent, onChange, className }: Visu
             StarterKit,
             PauseExtension,
             EmphasisExtension,
+            ProsodyExtension,
         ],
         content: initialContent, // Tiptap tries to parse this as HTML. <break> and <emphasis> tags should be picked up by our extensions' parseHTML.
         editorProps: {
@@ -90,10 +92,50 @@ export const VisualScriptEditor = ({ initialContent, onChange, className }: Visu
             });
 
             // Emphasis: <emphasis class="ssml-emphasis">text</emphasis> -> <emphasis>text</emphasis>
-            // The class attribute is harmless but we can remove it.
             html = html.replace(/ class="ssml-emphasis"/g, '');
 
-            onChange(html);
+            // Prosody: <span data-ssml-pitch="high" style="...">text</span> -> <prosody pitch="+10%">text</prosody>
+            // We use a general replacer for data-ssml attributes
+            // Note: Tiptap might nest spans if we apply both pitch and volume.
+            // <span data-ssml-pitch="high"><span data-ssml-volume="loud">text</span></span>
+            // This replacement needs to be recursive or run multiple times?
+            // Simple string replace might fail on nested tags if we are not careful.
+            // But since we want to modify the *tag* itself, regex is okay if we target the opening tag and closing tag?
+            // No, closing tag </span> is generic.
+
+            // Better approach: Use a DOMParser to traverse and transform?
+            // But we are in React/Browser client, so we can use DOMParser.
+            // However, regex might be faster for simple replacements if structure is predictable.
+            // Tiptap marks usually wrap text.
+
+            // Let's try DOMParser for robustness.
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Convert spans with data-ssml-pitch/volume/rate to prosody tags
+            const spans = doc.querySelectorAll('span[data-ssml-pitch], span[data-ssml-volume], span[data-ssml-rate]');
+            spans.forEach(span => {
+                const pitch = span.getAttribute('data-ssml-pitch');
+                const volume = span.getAttribute('data-ssml-volume');
+                // const rate = span.getAttribute('data-ssml-rate');
+
+                // Create prosody element
+                const prosody = doc.createElement('prosody');
+                if (pitch) prosody.setAttribute('pitch', pitch === 'high' ? '+10%' : pitch === 'low' ? '-10%' : '0%');
+                if (volume) prosody.setAttribute('volume', volume === 'loud' ? '+6dB' : volume === 'soft' ? '-6dB' : '0dB');
+
+                // key: Move children to prosody
+                while (span.firstChild) {
+                    prosody.appendChild(span.firstChild);
+                }
+
+                // Replace span with prosody
+                span.parentNode?.replaceChild(prosody, span);
+            });
+
+            // Serialize back to string
+            // logic to unwrap <body>
+            onChange(doc.body.innerHTML);
         },
     });
 
@@ -123,14 +165,64 @@ export const VisualScriptEditor = ({ initialContent, onChange, className }: Visu
 
                 <div className="w-px h-6 bg-gray-300 mx-2"></div>
 
+                {/* Prosody Controls */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded p-1">
+                    <span className="text-xs font-bold text-gray-400 px-1">TINE</span>
+                    <button
+                        onClick={() => editor.chain().focus().setProsody({ pitch: 'high' }).run()}
+                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { pitch: 'high' }) ? 'bg-rose-600 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
+                        title="Pitch High"
+                    >
+                        High
+                    </button>
+                    <button
+                        onClick={() => editor.chain().focus().setProsody({ pitch: 'low' }).run()}
+                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { pitch: 'low' }) ? 'bg-teal-600 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
+                        title="Pitch Low"
+                    >
+                        Low
+                    </button>
+                </div>
+
+                <div className="flex items-center gap-1 bg-gray-100 rounded p-1 ml-2">
+                    <span className="text-xs font-bold text-gray-400 px-1">VOL</span>
+                    <button
+                        onClick={() => editor.chain().focus().setProsody({ volume: 'loud' }).run()}
+                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { volume: 'loud' }) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
+                        title="Volume Loud"
+                    >
+                        Loud
+                    </button>
+                    <button
+                        onClick={() => editor.chain().focus().setProsody({ volume: 'soft' }).run()}
+                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { volume: 'soft' }) ? 'bg-gray-400 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
+                        title="Volume Soft"
+                    >
+                        Soft
+                    </button>
+                </div>
+
+                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+
+                <button
+                    onClick={() => editor.chain().focus().unsetProsody().run()}
+                    className="px-2 py-1 rounded text-xs font-bold hover:bg-red-100 text-red-400 transition-colors"
+                    title="Clear Formatting"
+                >
+                    <X size={14} />
+                </button>
+
+                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+
                 <button
                     onClick={() => addPause(0.5)}
                     className="p-2 rounded hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm font-bold text-gray-700"
                     title="間を挿入 (0.5s)"
                 >
                     <PauseCircle size={18} />
-                    間 (0.5s)
+                    0.5s
                 </button>
+
 
                 <button
                     onClick={() => addPause(1.0)}
