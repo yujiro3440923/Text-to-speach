@@ -46,6 +46,9 @@ export default function Home() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [isFileReading, setIsFileReading] = useState(false);
 
+  const [provider, setProvider] = useState<'google' | 'fish'>('google');
+  const [fishVoiceId, setFishVoiceId] = useState('');
+
   const [calculatedRate, setCalculatedRate] = useState(1.0);
 
   // Current Text for Logic
@@ -168,6 +171,7 @@ export default function Home() {
 
     if (!textToRead) return toast.warning('テキストがありません');
     if (selectedTextSource === 'ai' && isAiLoading) return toast.warning('AI処理中です');
+    if (provider === 'fish' && !fishVoiceId) return toast.warning('Fish AudioのVoice IDを入力してください');
 
     setIsGeneratingAudio(true);
     setAudioPreviewUrl(null);
@@ -175,15 +179,18 @@ export default function Home() {
 
     try {
       // Send targetSeconds to server. Server calculates speakingRate.
+      const payload = {
+        text: textToRead,
+        voiceName: provider === 'google' ? selectedVoice : fishVoiceId,
+        targetSeconds: seconds,
+        pitch: pitch,
+        provider: provider
+      };
+
       const response = await fetch('/api/generate-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: textToRead,
-          voiceName: selectedVoice,
-          targetSeconds: seconds,
-          pitch: pitch
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
@@ -376,6 +383,7 @@ export default function Home() {
                         initialContent={inputText}
                         onChange={setInputText}
                         className="h-full border-none rounded-none"
+                        provider={provider}
                       />
                     </div>
                   </div>
@@ -419,16 +427,51 @@ export default function Home() {
                 <div className="bg-gray-900 rounded-xl p-6 text-white flex flex-col gap-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="w-full">
-                      <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Voice Actor Selection</label>
-                      <select
-                        value={selectedVoice}
-                        onChange={(e) => setSelectedVoice(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium"
-                      >
-                        <option value="ja-JP-Neural2-B">女性アナウンサー (Neural2-B)</option>
-                        <option value="ja-JP-Neural2-C">男性アナウンサー (Neural2-C)</option>
-                        <option value="ja-JP-Neural2-D">男性ナレーター (Neural2-D)</option>
-                      </select>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase">Voice Provider</label>
+                      </div>
+                      <div className="flex bg-gray-800 rounded-lg p-1 mb-4">
+                        <button
+                          onClick={() => setProvider('google')}
+                          className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${provider === 'google' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                        >
+                          Google TTS
+                        </button>
+                        <button
+                          onClick={() => setProvider('fish')}
+                          className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${provider === 'fish' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                        >
+                          Fish Audio
+                        </button>
+                      </div>
+
+                      {provider === 'google' ? (
+                        <>
+                          <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Google Voice Model</label>
+                          <select
+                            value={selectedVoice}
+                            onChange={(e) => setSelectedVoice(e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium"
+                          >
+                            <option value="ja-JP-Neural2-B">女性アナウンサー (Neural2-B)</option>
+                            <option value="ja-JP-Neural2-C">男性アナウンサー (Neural2-C)</option>
+                            <option value="ja-JP-Neural2-D">男性ナレーター (Neural2-D)</option>
+                          </select>
+                        </>
+                      ) : (
+                        <>
+                          <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Fish Audio Voice ID</label>
+                          <input
+                            type="text"
+                            value={fishVoiceId}
+                            onChange={(e) => setFishVoiceId(e.target.value)}
+                            placeholder="Reference ID (e.g. 4f96d...)"
+                            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium text-sm font-mono"
+                          />
+                          <p className="text-[10px] text-gray-400 mt-1">Fish AudioのモデルIDを入力してください。</p>
+                        </>
+                      )}
+
                     </div>
                     <div className="w-full text-gray-900">
                       {/* Pitch Slider Component Here */}

@@ -10,6 +10,7 @@ export default function SettingsPage() {
   /* State */
   const [apiKey, setApiKey] = useState('');
   const [openaiKey, setOpenaiKey] = useState('');
+  const [fishKey, setFishKey] = useState('');
 
   const [passwordInput, setPasswordInput] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -40,6 +41,7 @@ export default function SettingsPage() {
         setOrgId(orgData.id);
         setApiKey(orgData.google_api_key || '');
         setOpenaiKey(orgData.openai_api_key || '');
+        setFishKey(orgData.fish_api_key || '');
         if (orgData.settings_password) {
           setCurrentPassword(orgData.settings_password);
         }
@@ -69,7 +71,8 @@ export default function SettingsPage() {
     // Update object
     const updates: any = {
       google_api_key: apiKey,
-      openai_api_key: openaiKey
+      openai_api_key: openaiKey,
+      fish_api_key: fishKey
     };
 
     if (newPassword && newPassword.length >= 4) {
@@ -165,6 +168,19 @@ export default function SettingsPage() {
                   onChange={(e) => setOpenaiKey(e.target.value)}
                   className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
                   placeholder="sk-..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Fish Audio API Key
+                </label>
+                <input
+                  type="text"
+                  value={fishKey}
+                  onChange={(e) => setFishKey(e.target.value)}
+                  className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                  placeholder="Fish Audio API Key"
                 />
               </div>
             </div>
