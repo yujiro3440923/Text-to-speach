@@ -26,7 +26,17 @@ export const calculateSpeakingRate = (text: string, targetSeconds: number): numb
     // 連続する空白は1文字扱いにするなどの調整を入れても良い。
     // ここではシンプルに length で計算し、係数 5.5 で調整する。
 
-    const charCount = text.length;
+    // SSMLタグを除去して文字数をカウントする
+    // 簡易的な正規表現で <...> を空文字に置換
+    const cleanText = text.replace(/<[^>]*>/g, '');
+    const charCount = cleanText.length;
+
+    // Pauseタグの時間を考慮するか？
+    // 今回は「全体の文字量」に対する「話し手の速度」を定義したいので、
+    // Pauseは「無音の時間」として TargetSeconds から引くべき論理もあるが、
+    // シンプルに「文字密度」だけで計算したほうが、話速自体の設定としては自然になる場合が多い。
+    // ここでは「タグを除いた純粋な文字数」で計算する。
+
     const standardDuration = charCount / STANDARD_CHARS_PER_SEC;
 
     let rate = standardDuration / targetSeconds;

@@ -6,7 +6,9 @@ const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000000';
 
 export async function POST(request: Request) {
   try {
-    const { text, voiceName, targetSeconds } = await request.json();
+    // speakingRate (速度) と pitch (高さ) を受け取る
+    // targetSeconds からの自動計算は維持
+    const { text, voiceName, targetSeconds, pitch } = await request.json();
 
     if (!text || !targetSeconds) {
       return NextResponse.json({ error: 'Text and targetSeconds are required.' }, { status: 400 });
@@ -40,20 +42,31 @@ export async function POST(request: Request) {
     const apiKey = orgData.google_api_key.trim();
     const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
-    // サーバーサイドで厳密に速度を計算
+    // サーバーサイドで厳密に速度を計算 (SSMLタグ除外済み)
     const speakingRate = calculateSpeakingRate(text, parseFloat(targetSeconds));
+
+    // SSMLとして構築
+    // ユーザー入力が既にSSMLタグを含んでいる前提。
+    // 全体を <speak> タグで囲む必要がある。
+    // 入力に <speak> が含まれているかチェック
+    let ssmlInput = text;
+    if (!ssmlInput.includes('<speak>')) {
+      ssmlInput = `<speak>${ssmlInput}</speak>`;
+    }
 
     console.log(`[Generate Speech] Text Length: ${text.length}, Target: ${targetSeconds}s, Calculated Rate: ${speakingRate}`);
 
+    // Google TTS SSML Input
     const body = {
-      input: { text: text },
+      input: { ssml: ssmlInput },
       voice: {
         languageCode: 'ja-JP',
         name: voiceName || 'ja-JP-Neural2-B'
       },
       audioConfig: {
         audioEncoding: 'MP3',
-        speakingRate: speakingRate
+        speakingRate: speakingRate,
+        pitch: pitch || 0.0 // Default 0
       },
     };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Upload, FileText, ArrowRight, ArrowLeft, Wand2, Check, History, Settings, FileUp, X, Download, Volume2, LogOut, User, Play, RefreshCw, Type } from 'lucide-react';
 import Link from 'next/link';
@@ -11,8 +11,9 @@ import * as XLSX from 'xlsx';
 
 import { TimePicker } from '@/components/TimePicker';
 import { StatusPanel } from '@/components/StatusPanel';
+import { PitchSlider } from '@/components/PitchSlider';
+import { EditorToolbar } from '@/components/EditorToolbar';
 
-// --- Main Component ---
 export default function Home() {
   const router = useRouter();
   const supabase = createBrowserClient(
@@ -36,6 +37,7 @@ export default function Home() {
   // Audio Generation Stats
   const [selectedVoice, setSelectedVoice] = useState('ja-JP-Neural2-B');
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [pitch, setPitch] = useState(0.0); // Pitch Control
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -137,6 +139,27 @@ export default function Home() {
     }
   };
 
+  const handleInsertTag = (tagStart: string, tagEnd: string = '') => {
+    // Only support insertion in Original Text area for now or whatever is active?
+    // User can edit both, but usually edits the one selected.
+
+    const isOriginal = selectedTextSource === 'original';
+    const textVal = isOriginal ? inputText : aiRevisedText;
+    const setTextVal = isOriginal ? setInputText : setAiRevisedText;
+
+    const textarea = document.querySelector(`textarea[name="${selectedTextSource}"]`) as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newText = textVal.substring(0, start) + tagStart + textVal.substring(start, end) + tagEnd + textVal.substring(end);
+      setTextVal(newText);
+      // Ideally we would restore cursor position here, but state update is async.
+    } else {
+      // Fallback: Append
+      setTextVal(prev => prev + tagStart + tagEnd);
+    }
+  };
+
   const handlePreviewAudio = async () => {
     const textToRead = selectedTextSource === 'ai' ? aiRevisedText : inputText;
 
@@ -155,7 +178,8 @@ export default function Home() {
         body: JSON.stringify({
           text: textToRead,
           voiceName: selectedVoice,
-          targetSeconds: seconds
+          targetSeconds: seconds,
+          pitch: pitch
         }),
       });
       const data = await response.json();
@@ -338,6 +362,11 @@ export default function Home() {
 
                 <StatusPanel currentText={currentText} targetSeconds={seconds} />
 
+                {/* Editor Toolbar */}
+                <div className="flex justify-end">
+                  <EditorToolbar onInsert={handleInsertTag} />
+                </div>
+
                 {/* 2-Column Editor */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]">
 
@@ -350,9 +379,10 @@ export default function Home() {
                       {selectedTextSource === 'original' && <Check size={16} className="text-gray-900" />}
                     </div>
                     <textarea
+                      name="original"
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
-                      className="flex-1 w-full p-4 resize-none focus:outline-none text-base text-gray-800 bg-white"
+                      className="flex-1 w-full p-4 resize-none focus:outline-none text-base text-gray-800 bg-white font-mono"
                       placeholder="原稿..."
                     />
                   </div>
@@ -374,9 +404,10 @@ export default function Home() {
                     ) : (
                       <>
                         <textarea
+                          name="ai"
                           value={aiRevisedText}
                           onChange={(e) => setAiRevisedText(e.target.value)}
-                          className="flex-1 w-full p-4 resize-none focus:outline-none text-base text-gray-800 bg-white"
+                          className="flex-1 w-full p-4 resize-none focus:outline-none text-base text-gray-800 bg-white font-mono"
                           placeholder="AI output..."
                         />
                         {/* AI Retry Overlay Actions */}
@@ -392,21 +423,27 @@ export default function Home() {
                 </div>
 
                 {/* Control Footer */}
-                <div className="bg-gray-900 rounded-xl p-6 text-white flex flex-col md:flex-row gap-6 items-center">
-                  <div className="flex-1 w-full">
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Voice Actor Selection</label>
-                    <select
-                      value={selectedVoice}
-                      onChange={(e) => setSelectedVoice(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium"
-                    >
-                      <option value="ja-JP-Neural2-B">女性アナウンサー (Neural2-B)</option>
-                      <option value="ja-JP-Neural2-C">男性アナウンサー (Neural2-C)</option>
-                      <option value="ja-JP-Neural2-D">男性ナレーター (Neural2-D)</option>
-                    </select>
+                <div className="bg-gray-900 rounded-xl p-6 text-white flex flex-col gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="w-full">
+                      <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Voice Actor Selection</label>
+                      <select
+                        value={selectedVoice}
+                        onChange={(e) => setSelectedVoice(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium"
+                      >
+                        <option value="ja-JP-Neural2-B">女性アナウンサー (Neural2-B)</option>
+                        <option value="ja-JP-Neural2-C">男性アナウンサー (Neural2-C)</option>
+                        <option value="ja-JP-Neural2-D">男性ナレーター (Neural2-D)</option>
+                      </select>
+                    </div>
+                    <div className="w-full text-gray-900">
+                      {/* Pitch Slider Component Here */}
+                      <PitchSlider pitch={pitch} onChange={setPitch} />
+                    </div>
                   </div>
 
-                  <div className="flex-1 w-full flex items-end">
+                  <div className="flex-1 w-full flex items-end pt-4 border-t border-gray-700">
                     <div className="w-full">
                       <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Target: {seconds}s</label>
                       <button
@@ -415,7 +452,7 @@ export default function Home() {
                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isGeneratingAudio ? <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div> : <Play size={20} fill="currentColor" />}
-                        {isGeneratingAudio ? 'GENERATING...' : 'PREVIEW BROADCAST'}
+                        {isGeneratingAudio ? 'GENERATING BROADCAST AUDIO...' : 'PREVIEW BROADCAST'}
                       </button>
                     </div>
                   </div>
@@ -436,8 +473,7 @@ export default function Home() {
                       <button
                         onClick={handleDownloadAndSave}
                         disabled={saveStatus !== 'idle'}
-                        className={`w-full px-8 py-4 rounded-xl font-bold text-white shadow-md flex justify-center items-center gap-2 transition-all ${saveStatus === 'saved' ? 'bg-gray-800 cursor-default' : 'bg-green-600 hover:bg-green-700 hover:shadow-lg'
-                          }`}
+                        className={`w-full px-8 py-4 rounded-xl font-bold text-white shadow-md flex justify-center items-center gap-2 transition-all ${saveStatus === 'saved' ? 'bg-gray-800 cursor-default' : 'bg-green-600 hover:bg-green-700 hover:shadow-lg'}`}
                       >
                         {saveStatus === 'saving' ? 'SAVING...' : saveStatus === 'saved' ? <><Check size={20} /> SAVED</> : <><Download size={20} /> DOWNLOAD MASTER</>}
                       </button>
