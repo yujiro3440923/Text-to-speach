@@ -31,9 +31,20 @@ export const ProsodyExtension = Mark.create<ProsodyOptions>({
                     if (!attributes.pitch) {
                         return {};
                     }
+                    const isHigh = attributes.pitch === 'high';
                     return {
                         'data-ssml-pitch': attributes.pitch,
-                        style: `color: ${attributes.pitch === 'high' ? '#e11d48' : '#0f766e'}; font-style: italic;`, // Visual feedback: Red for high, Teal for low
+                        style: `
+                background-color: ${isHigh ? '#ffe4e6' : '#ccfbf1'};
+                color: ${isHigh ? '#be123c' : '#0f766e'};
+                padding: 1px 4px;
+                border-radius: 4px;
+                border: 1px solid ${isHigh ? '#fda4af' : '#5eead4'};
+                font-size: 0.85em;
+                font-weight: 600;
+                vertical-align: middle;
+                margin: 0 1px;
+            `,
                     };
                 },
             },
@@ -44,9 +55,20 @@ export const ProsodyExtension = Mark.create<ProsodyOptions>({
                     if (!attributes.volume) {
                         return {};
                     }
+                    const isLoud = attributes.volume === 'loud';
                     return {
                         'data-ssml-volume': attributes.volume,
-                        style: `font-size: ${attributes.volume === 'loud' ? '1.2em' : '0.8em'};`, // Visual feedback
+                        style: `
+                background-color: ${isLoud ? '#e0e7ff' : '#f3f4f6'};
+                color: ${isLoud ? '#4338ca' : '#6b7280'};
+                padding: 1px 4px;
+                border-radius: 4px;
+                border: 1px solid ${isLoud ? '#a5b4fc' : '#d1d5db'};
+                font-size: ${isLoud ? '1em' : '0.85em'};
+                font-weight: 600;
+                vertical-align: middle;
+                 margin: 0 1px;
+            `,
                     };
                 },
             },

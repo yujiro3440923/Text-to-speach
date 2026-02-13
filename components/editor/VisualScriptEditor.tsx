@@ -152,86 +152,91 @@ export const VisualScriptEditor = ({ initialContent, onChange, className }: Visu
 
     return (
         <div className={`flex flex-col border-2 rounded-xl overflow-hidden bg-white transition-all ${className}`}>
-            {/* Toolbar */}
-            <div className="bg-gray-50 border-b border-gray-200 p-2 flex items-center gap-2 flex-wrap">
-                <button
-                    onClick={() => editor.chain().focus().toggleEmphasis().run()}
-                    className={`p-2 rounded hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm font-bold ${editor.isActive('emphasis') ? 'bg-gray-200 text-indigo-600' : 'text-gray-700'}`}
-                    title="強調 (Emphasis)"
-                >
-                    <Bold size={18} />
-                    強調
-                </button>
+            {/* Toolbar - Sticky & Professional */}
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-2 flex items-center gap-2 flex-wrap shadow-sm">
 
-                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+                {/* Group: emphasis */}
+                <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
+                    <button
+                        onClick={() => editor.chain().focus().toggleEmphasis().run()}
+                        className={`p-1.5 rounded-md transition-all flex items-center gap-1.5 text-xs font-bold ${editor.isActive('emphasis') ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-gray-200/50'}`}
+                        title="強調 (Bold)"
+                    >
+                        <Bold size={16} />
+                        <span className="hidden sm:inline">強調</span>
+                    </button>
+                </div>
 
-                {/* Prosody Controls */}
-                <div className="flex items-center gap-1 bg-gray-100 rounded p-1">
-                    <span className="text-xs font-bold text-gray-400 px-1">TINE</span>
+                <div className="w-px h-5 bg-gray-200 mx-1"></div>
+
+                {/* Group: Tone (Pitch) */}
+                <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
+                    <span className="text-[10px] font-extrabold text-gray-400 px-1 uppercase tracking-wider">Tone</span>
                     <button
                         onClick={() => editor.chain().focus().setProsody({ pitch: 'high' }).run()}
-                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { pitch: 'high' }) ? 'bg-rose-600 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
-                        title="Pitch High"
+                        className={`px-2 py-1 rounded-md text-xs font-bold transition-all ${editor.isActive('prosody', { pitch: 'high' }) ? 'bg-rose-100 text-rose-700 shadow-sm ring-1 ring-rose-200' : 'text-gray-600 hover:bg-gray-200/50'}`}
+                        title="高く (High Pitch)"
                     >
                         High
                     </button>
                     <button
                         onClick={() => editor.chain().focus().setProsody({ pitch: 'low' }).run()}
-                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { pitch: 'low' }) ? 'bg-teal-600 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
-                        title="Pitch Low"
+                        className={`px-2 py-1 rounded-md text-xs font-bold transition-all ${editor.isActive('prosody', { pitch: 'low' }) ? 'bg-teal-100 text-teal-700 shadow-sm ring-1 ring-teal-200' : 'text-gray-600 hover:bg-gray-200/50'}`}
+                        title="低く (Low Pitch)"
                     >
                         Low
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1 bg-gray-100 rounded p-1 ml-2">
-                    <span className="text-xs font-bold text-gray-400 px-1">VOL</span>
+                {/* Group: Volume */}
+                <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
+                    <span className="text-[10px] font-extrabold text-gray-400 px-1 uppercase tracking-wider">Vol</span>
                     <button
                         onClick={() => editor.chain().focus().setProsody({ volume: 'loud' }).run()}
-                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { volume: 'loud' }) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
-                        title="Volume Loud"
+                        className={`px-2 py-1 rounded-md text-xs font-bold transition-all ${editor.isActive('prosody', { volume: 'loud' }) ? 'bg-indigo-100 text-indigo-700 shadow-sm ring-1 ring-indigo-200' : 'text-gray-600 hover:bg-gray-200/50'}`}
+                        title="大きく (Loud)"
                     >
                         Loud
                     </button>
                     <button
                         onClick={() => editor.chain().focus().setProsody({ volume: 'soft' }).run()}
-                        className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('prosody', { volume: 'soft' }) ? 'bg-gray-400 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
-                        title="Volume Soft"
+                        className={`px-2 py-1 rounded-md text-xs font-bold transition-all ${editor.isActive('prosody', { volume: 'soft' }) ? 'bg-gray-200 text-gray-700 shadow-sm ring-1 ring-gray-300' : 'text-gray-600 hover:bg-gray-200/50'}`}
+                        title="小さく (Soft)"
                     >
                         Soft
                     </button>
                 </div>
 
-                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+                <div className="w-px h-5 bg-gray-200 mx-1"></div>
 
                 <button
                     onClick={() => editor.chain().focus().unsetProsody().run()}
-                    className="px-2 py-1 rounded text-xs font-bold hover:bg-red-100 text-red-400 transition-colors"
-                    title="Clear Formatting"
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    title="書式をクリア"
                 >
-                    <X size={14} />
+                    <X size={16} />
                 </button>
 
-                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+                <div className="flex-1"></div>
 
-                <button
-                    onClick={() => addPause(0.5)}
-                    className="p-2 rounded hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm font-bold text-gray-700"
-                    title="間を挿入 (0.5s)"
-                >
-                    <PauseCircle size={18} />
-                    0.5s
-                </button>
-
-
-                <button
-                    onClick={() => addPause(1.0)}
-                    className="p-2 rounded hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm font-bold text-gray-700"
-                    title="間を挿入 (1.0s)"
-                >
-                    <PauseCircle size={18} />
-                    間 (1.0s)
-                </button>
+                {/* Group: Pause */}
+                <div className="flex items-center gap-1 bg-amber-50 rounded-lg p-1 border border-amber-100">
+                    <span className="text-[10px] font-extrabold text-amber-500/70 px-1 uppercase tracking-wider">Break</span>
+                    <button
+                        onClick={() => addPause(0.5)}
+                        className="p-1.5 rounded-md hover:bg-amber-100 text-amber-700 transition-colors flex items-center gap-1 text-xs font-bold"
+                        title="間 (0.5s)"
+                    >
+                        <PauseCircle size={14} /> 0.5s
+                    </button>
+                    <button
+                        onClick={() => addPause(1.0)}
+                        className="p-1.5 rounded-md hover:bg-amber-100 text-amber-700 transition-colors flex items-center gap-1 text-xs font-bold"
+                        title="間 (1.0s)"
+                    >
+                        <PauseCircle size={14} /> 1.0s
+                    </button>
+                </div>
             </div>
 
             {/* Editor Content */}
