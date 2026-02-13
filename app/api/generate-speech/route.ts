@@ -46,182 +46,128 @@ export async function POST(request: Request) {
     }
 
     // 3. Last Resort: Hardcoded Demo ID (if RLS allows)
-    if (!apiKey && !process.env.FISH_API_KEY) { // Check both
+    if (!apiKey) {
       const { data: demoOrg } = await supabase
         .from('organizations')
-        .select('google_api_key, fish_api_key') // Fetch both
+        .select('google_api_key')
         .eq('id', DEMO_ORG_ID)
         .single();
 
-      if (demoOrg?.google_api_key) apiKey = demoOrg.google_api_key;
-      // fishKey logic handled below
+      if (demoOrg?.google_api_key) {
+        apiKey = demoOrg.google_api_key;
+      }
     }
 
-    // --- Provider Selection ---
-    // Default to Google if not specified
-    const provider = (request as any).provider || 'google'; // 'google' | 'fish'
+    if (!apiKey) {
+      console.error('System Configuration Error: API Key not found in Env or DB.');
+      return NextResponse.json({ error: 'System Configuration Error: API Key not found. Please set GOOGLE_API_KEY in Vercel or Database.' }, { status: 500 });
+    }
 
-    // --- GOOGLE TTS LOGIC ---
-    if (provider === 'google') {
-      if (!apiKey) {
-        // Try getting from DB again if we missed it (refactor opportunity, but keeping simple)
-        const { data: orgData } = await supabase.from('organizations').select('google_api_key').limit(1).single();
-        if (orgData?.google_api_key) apiKey = orgData.google_api_key;
-      }
+    apiKey = apiKey.trim();
+    const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
-      if (!apiKey) {
-        console.error('Configuration Error: Google API Key not found.');
-        return NextResponse.json({ error: 'Google API Key missing.' }, { status: 500 });
-      }
+    // --- PASS 1: Measurement ---
+    // Generate at standard 1.0x speed to measure "natural" duration
 
-      apiKey = apiKey.trim();
-      const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+    let ssmlInput = inputContent;
+    // Simple sanitization: Strip non-SSML tags if possible? 
+    // For now, let's just ensure <speak> wrap.
+    // Also strip generic <span> or <div> if they don't have ssml attributes, but that's hard with regex.
+    // Let's rely on frontend sending mostly clean HTML, but ensure <speak>.
 
-      // --- PASS 1: Measurement ---
-      let ssmlInput = inputContent;
-      if (!ssmlInput.includes('<speak>')) {
-        ssmlInput = `<speak>${ssmlInput}</speak>`;
-      }
+    if (!ssmlInput.includes('<speak>')) {
+      ssmlInput = `<speak>${ssmlInput}</speak>`;
+    }
 
-      const bodyPass1 = {
-        input: { ssml: ssmlInput },
-        voice: {
-          languageCode: 'ja-JP',
-          name: voiceName || 'ja-JP-Neural2-B'
-        },
-        audioConfig: {
-          audioEncoding: 'MP3',
-          speakingRate: 1.0,
-          pitch: pitch || 0.0
-        },
-      };
+    const bodyPass1 = {
+      input: { ssml: ssmlInput },
+      voice: {
+        languageCode: 'ja-JP',
+        name: voiceName || 'ja-JP-Neural2-B'
+      },
+      audioConfig: {
+        audioEncoding: 'MP3',
+        speakingRate: 1.0,
+        pitch: pitch || 0.0
+      },
+    };
 
-      const res1 = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPass1),
-      });
+    const res1 = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyPass1),
+    });
 
-      if (!res1.ok) {
-        const err = await res1.json();
-        throw new Error(err.error?.message || 'Google API Error (Pass 1)');
-      }
+    if (!res1.ok) {
+      const err = await res1.json();
+      throw new Error(err.error?.message || 'Google API Error (Pass 1)');
+    }
 
-      const data1 = await res1.json();
-      const buffer1 = Buffer.from(data1.audioContent, 'base64');
+    const data1 = await res1.json();
+    const buffer1 = Buffer.from(data1.audioContent, 'base64');
 
-      let naturalDuration = 0;
-      let finalAudioContent = data1.audioContent;
-      let finalRate = 1.0;
+    let naturalDuration = 0;
+    let finalAudioContent = data1.audioContent;
+    let finalRate = 1.0;
 
-      try {
-        naturalDuration = await getAudioDuration(buffer1);
-        console.log(`[Google Two-Pass] Natural: ${naturalDuration}s, Target: ${targetSeconds}s`);
+    // Safety Wrap for Duration & 2nd Pass
+    try {
+      naturalDuration = await getAudioDuration(buffer1);
+      console.log(`[Two-Pass] Natural Duration: ${naturalDuration}s`);
 
-        let adjustedRate = naturalDuration / parseFloat(targetSeconds);
-        if (adjustedRate < 0.25) adjustedRate = 0.25;
-        if (adjustedRate > 4.0) adjustedRate = 4.0;
-        adjustedRate = Math.round(adjustedRate * 100) / 100;
+      // --- Calculate Correction ---
+      let adjustedRate = naturalDuration / parseFloat(targetSeconds);
 
-        if (Math.abs(adjustedRate - 1.0) > 0.05) {
-          const bodyPass2 = {
-            ...bodyPass1,
-            audioConfig: { ...bodyPass1.audioConfig, speakingRate: adjustedRate }
-          };
+      // Clamp for API limits (0.25 - 4.0)
+      if (adjustedRate < 0.25) adjustedRate = 0.25;
+      if (adjustedRate > 4.0) adjustedRate = 4.0;
 
-          const res2 = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bodyPass2),
-          });
+      adjustedRate = Math.round(adjustedRate * 100) / 100;
 
-          if (res2.ok) {
-            const data2 = await res2.json();
-            finalAudioContent = data2.audioContent;
-            finalRate = adjustedRate;
+      console.log(`[Two-Pass] Target: ${targetSeconds}s, New Rate: ${adjustedRate}`);
+
+      // Google TTS rate deviation needs correction?
+      // If rate is effectively 1.0 (within margin), we can skip.
+      if (Math.abs(adjustedRate - 1.0) > 0.05) {
+        // --- PASS 2: Generation with Corrected Rate ---
+        const bodyPass2 = {
+          ...bodyPass1,
+          audioConfig: {
+            ...bodyPass1.audioConfig,
+            speakingRate: adjustedRate
           }
+        };
+
+        const res2 = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPass2),
+        });
+
+        if (!res2.ok) {
+          // If Pass 2 fails, log it but return Pass 1 (better than nothing)
+          const err = await res2.json();
+          console.error('Google API Error (Pass 2):', err);
+        } else {
+          const data2 = await res2.json();
+          finalAudioContent = data2.audioContent;
+          finalRate = adjustedRate;
         }
-      } catch (innerError) {
-        console.warn('Google Two-Pass optimization skipped:', innerError);
       }
-
-      return NextResponse.json({
-        audioContent: finalAudioContent,
-        meta: { calculatedRate: finalRate, naturalDuration, textLength: inputContent.length }
-      });
+    } catch (innerError) {
+      console.error('Two-Pass Optimization Failed (Falling back to 1.0x):', innerError);
+      // Fallback: naturalDuration might be 0, calculatedRate 1.0
+      // We still return the audio from Pass 1.
     }
 
-    // --- FISH AUDIO LOGIC ---
-    else if (provider === 'fish') {
-      // 1. Get Fish Key
-      let fishKey = process.env.FISH_API_KEY;
-      if (!fishKey) {
-        const { data: orgData } = await supabase.from('organizations').select('fish_api_key').limit(1).single();
-        if (orgData?.fish_api_key) fishKey = orgData.fish_api_key;
+    return NextResponse.json({
+      audioContent: finalAudioContent,
+      meta: {
+        calculatedRate: finalRate,
+        naturalDuration: naturalDuration,
+        textLength: inputContent.length
       }
-
-      if (!fishKey) {
-        return NextResponse.json({ error: 'Fish Audio API Key missing. Please set it in Settings.' }, { status: 500 });
-      }
-
-      // 2. Prepare Request
-      // Fish Audio uses msgpack by default usually, but supports JSON?
-      // POST https://api.fish.audio/v1/tts
-      // Headers: Authorization: Bearer {token}, Content-Type: application/json
-
-      // Default Voice ID if none provided (Need a valid one)
-      // Example: '4f96d66948594243867e411f5c66d1f9' (Some random ID, user must provide via voiceName)
-      const referenceId = voiceName;
-
-      if (!referenceId) {
-        return NextResponse.json({ error: 'Voice ID (reference_id) is required for Fish Audio.' }, { status: 400 });
-      }
-
-      // Fish Audio doesn't support generic "targetSeconds" directly.
-      // We will skip Two-Pass for Fish Audio for now (complex to recalc speed) 
-      // OR implement simple speed adjustment: speed = 1.0.
-
-      // TODO: Implement Two-Pass for Fish if needed. For now, 1.0x.
-
-      const body = {
-        text: text, // Fish supports raw text with tags like (happy)
-        reference_id: referenceId,
-        format: "mp3",
-        mp3_bitrate: 128,
-        latency: "normal"
-      };
-
-      const res = await fetch("https://api.fish.audio/v1/tts", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${fishKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Fish Audio API Error: ${errorText}`);
-      }
-
-      // Fish returns binary audio directly (buffer), NOT base64 json usually?
-      // Wait, doc says "Returns audio data".
-      const audioBuffer = await res.arrayBuffer();
-      const base64Audio = Buffer.from(audioBuffer).toString('base64');
-
-      // Calculate duration roughly
-      const mp3Buff = Buffer.from(audioBuffer);
-      let duration = 0;
-      try { duration = await getAudioDuration(mp3Buff); } catch (e) { }
-
-      return NextResponse.json({
-        audioContent: base64Audio,
-        meta: { calculatedRate: 1.0, naturalDuration: duration, textLength: text.length }
-      });
-    }
-
-    return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
+    });
 
   } catch (error: any) {
     console.error('TTS Error:', error);

@@ -14,7 +14,3 @@ COMMENT ON COLUMN organizations.openai_api_key IS 'User provided OpenAI API Key.
 COMMENT ON COLUMN organizations.settings_password IS 'Password to access the Settings page.';
 
 -- Updated at 2026-02-13 15:35
-
--- Phase 11: Fish Audio Integration
-ALTER TABLE organizations ADD COLUMN IF NOT EXISTS fish_api_key text;
-COMMENT ON COLUMN organizations.fish_api_key IS 'API Key for Fish Audio integration.';

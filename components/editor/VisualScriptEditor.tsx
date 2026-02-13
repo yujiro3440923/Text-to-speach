@@ -9,10 +9,9 @@ type VisualScriptEditorProps = {
     initialContent: string;
     onChange: (ssml: string) => void;
     className?: string;
-    provider?: 'google' | 'fish';
 };
 
-export const VisualScriptEditor = ({ initialContent, onChange, className, provider = 'google' }: VisualScriptEditorProps) => {
+export const VisualScriptEditor = ({ initialContent, onChange, className }: VisualScriptEditorProps) => {
 
     // Function to serialize Tiptap HTML to clean SSML
     // Tiptap's getHTML() returns standard HTML. We configured our extensions to render <break> and <emphasis>.
@@ -141,17 +140,6 @@ export const VisualScriptEditor = ({ initialContent, onChange, className, provid
                     <PauseCircle size={18} />
                     間 (1.0s)
                 </button>
-
-                {provider === 'fish' && (
-                    <>
-                        <div className="w-px h-6 bg-gray-300 mx-2"></div>
-                        <span className="text-xs text-gray-400 font-bold mr-2">Emotion:</span>
-                        <button onClick={() => editor.chain().focus().insertContent('(happy)').run()} className="p-2 rounded hover:bg-blue-100 text-blue-600 font-bold text-xs border border-blue-200">Happy</button>
-                        <button onClick={() => editor.chain().focus().insertContent('(sad)').run()} className="p-2 rounded hover:bg-blue-100 text-blue-600 font-bold text-xs border border-blue-200">Sad</button>
-                        <button onClick={() => editor.chain().focus().insertContent('(angry)').run()} className="p-2 rounded hover:bg-blue-100 text-blue-600 font-bold text-xs border border-blue-200">Angry</button>
-                        <button onClick={() => editor.chain().focus().insertContent('(feature)').run()} className="p-2 rounded hover:bg-blue-100 text-blue-600 font-bold text-xs border border-blue-200">Feature</button>
-                    </>
-                )}
             </div>
 
             {/* Editor Content */}
