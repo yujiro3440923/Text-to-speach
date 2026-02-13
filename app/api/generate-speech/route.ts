@@ -1,17 +1,30 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/server';
+import { calculateSpeakingRate } from '@/lib/audioUtils';
 
 const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000000';
 
 export async function POST(request: Request) {
   try {
-    // speakingRate (速度) を受け取るように追加
-    const { text, voiceName, speakingRate } = await request.json();
+    const { text, voiceName, targetSeconds } = await request.json();
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    if (!text || !targetSeconds) {
+      return NextResponse.json({ error: 'Text and targetSeconds are required.' }, { status: 400 });
+    }
+
+    const supabase = await createClient();
+
+    // API Key retrieval needs to be secure. 
+    // Ideally use Service Role or Env Var. 
+    // Assuming logged in user has access to org config for now via RLS or logic.
+    // However, `createClient` uses standard headers.
+    // If RLS prevents reading organizations, this fails.
+    // For this refactor, we stick to the existing pattern but ensure safety.
+
+    // NOTE: In a real production app with RLS, we should use a Service Role client 
+    // for reading system-wide configurations like API keys, 
+    // OR ensure the user belongs to the organization.
+    // Here we query as the user.
 
     const { data: orgData, error: dbError } = await supabase
       .from('organizations')
@@ -20,22 +33,27 @@ export async function POST(request: Request) {
       .single();
 
     if (dbError || !orgData?.google_api_key) {
-      return NextResponse.json({ error: 'Google APIキーが設定されていません。' }, { status: 400 });
+      console.error('Organization or Key not found', dbError);
+      return NextResponse.json({ error: 'System Configuration Error: API Key not found.' }, { status: 500 });
     }
 
     const apiKey = orgData.google_api_key.trim();
     const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
+    // サーバーサイドで厳密に速度を計算
+    const speakingRate = calculateSpeakingRate(text, parseFloat(targetSeconds));
+
+    console.log(`[Generate Speech] Text Length: ${text.length}, Target: ${targetSeconds}s, Calculated Rate: ${speakingRate}`);
+
     const body = {
       input: { text: text },
-      voice: { 
-        languageCode: 'ja-JP', 
+      voice: {
+        languageCode: 'ja-JP',
         name: voiceName || 'ja-JP-Neural2-B'
       },
-      audioConfig: { 
+      audioConfig: {
         audioEncoding: 'MP3',
-        // 速度設定: 0.25 〜 4.0。 1.0が標準。
-        speakingRate: speakingRate || 1.0 
+        speakingRate: speakingRate
       },
     };
 
@@ -51,7 +69,13 @@ export async function POST(request: Request) {
       throw new Error(data.error?.message || 'Google API Error');
     }
 
-    return NextResponse.json({ audioContent: data.audioContent });
+    return NextResponse.json({
+      audioContent: data.audioContent,
+      meta: {
+        calculatedRate: speakingRate,
+        textLength: text.length
+      }
+    });
 
   } catch (error: any) {
     console.error('TTS Error:', error);
