@@ -29,17 +29,41 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
-    const { data: orgData, error: dbError } = await supabase
-      .from('organizations')
-      .select('google_api_key')
-      .eq('id', DEMO_ORG_ID)
-      .single();
+    // 1. Try Environment Variable (Best for Vercel/Production)
+    let apiKey = process.env.GOOGLE_API_KEY;
 
-    if (dbError || !orgData?.google_api_key) {
-      return NextResponse.json({ error: 'System Configuration Error: API Key not found.' }, { status: 500 });
+    if (!apiKey) {
+      // 2. Try DB (User's Organization)
+      const { data: orgData, error: dbError } = await supabase
+        .from('organizations')
+        .select('google_api_key')
+        .limit(1) // Just get the first one available to this user
+        .single();
+
+      if (!dbError && orgData?.google_api_key) {
+        apiKey = orgData.google_api_key;
+      }
     }
 
-    const apiKey = orgData.google_api_key.trim();
+    // 3. Last Resort: Hardcoded Demo ID (if RLS allows)
+    if (!apiKey) {
+      const { data: demoOrg } = await supabase
+        .from('organizations')
+        .select('google_api_key')
+        .eq('id', DEMO_ORG_ID)
+        .single();
+
+      if (demoOrg?.google_api_key) {
+        apiKey = demoOrg.google_api_key;
+      }
+    }
+
+    if (!apiKey) {
+      console.error('System Configuration Error: API Key not found in Env or DB.');
+      return NextResponse.json({ error: 'System Configuration Error: API Key not found. Please set GOOGLE_API_KEY in Vercel or Database.' }, { status: 500 });
+    }
+
+    apiKey = apiKey.trim();
     const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
     // --- PASS 1: Measurement ---
