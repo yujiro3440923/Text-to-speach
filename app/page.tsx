@@ -14,6 +14,7 @@ import { StatusPanel } from '@/components/StatusPanel';
 import { PitchSlider } from '@/components/PitchSlider';
 // import { EditorToolbar } from '@/components/EditorToolbar'; // Removed
 import { VisualScriptEditor } from '@/components/editor/VisualScriptEditor';
+import { Sidebar } from '@/components/Sidebar';
 
 
 export default function Home() {
@@ -263,24 +264,13 @@ export default function Home() {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="bg-gray-900 p-2 rounded-lg text-white"><Wand2 size={20} /></div>
-            <h1 className="text-xl font-bold tracking-tight hidden sm:block">Radio SaaS <span className="text-gray-400 font-normal text-sm ml-2">Broadcast Grade</span></h1>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-4">
-            <span className="text-xs font-bold text-gray-500 mr-2 hidden sm:inline">{userEmail}</span>
-            <button onClick={handleLogout} className="text-xs font-bold text-gray-900 hover:bg-gray-100 py-2 px-3 rounded-md flex items-center gap-2 border border-gray-200">
-              <LogOut size={14} /> <span className="hidden sm:inline">Sign Out</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <Sidebar />
 
-      <main className="py-10 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 ml-64 py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto space-y-8">
+
+          {/* Header Area (since we removed global header, maybe show title? or just content) */}
+          {/* For Studio, we might want a simple breadcrumb or title if Sidebar represents the app */}
 
           {/* STEP 1: Input & Settings */}
           {step === 1 && (
