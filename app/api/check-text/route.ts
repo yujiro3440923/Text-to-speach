@@ -16,15 +16,21 @@ export async function POST(request: Request) {
     const { data: orgData, error: dbError } = await supabase
       .from('organizations')
       .select('openai_api_key')
-      .eq('id', DEMO_ORG_ID)
+      .limit(1)
       .single();
 
-    if (dbError || !orgData?.openai_api_key) {
+    // Prioritize DB Key, fallback to Env
+    let apiKey = process.env.OPENAI_API_KEY;
+    if (orgData?.openai_api_key) {
+      apiKey = orgData.openai_api_key;
+    }
+
+    if (!apiKey) {
       return NextResponse.json({ error: 'OpenAI APIキーが設定されていません。' }, { status: 400 });
     }
 
     const openai = new OpenAI({
-      apiKey: orgData.openai_api_key,
+      apiKey: apiKey,
     });
 
     const targetCharCount = Math.floor(seconds * 5.5);

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Sidebar } from '@/components/Sidebar';
-import { Play, Download, Calendar, Clock, FileText } from 'lucide-react';
+import { Play, Square, Download, Calendar, Clock, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -33,11 +33,43 @@ export default function HistoryPage() {
     fetchHistory();
   }, [supabase]);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   const handlePlay = (url: string, id: string) => {
+    // If playing same audio, stop it
+    if (playingId === id) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlayingId(null);
+      return;
+    }
+
+    // If playing another audio, stop it first
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
     const audio = new Audio(url);
-    audio.play();
+    audioRef.current = audio;
+
+    audio.play().catch(e => console.error("Play error:", e));
     setPlayingId(id);
-    audio.onended = () => setPlayingId(null);
+
+    audio.onended = () => {
+      setPlayingId(null);
+      audioRef.current = null;
+    };
   };
 
   return (
@@ -80,10 +112,10 @@ export default function HistoryPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => handlePlay(item.file_url, item.id)}
-                    className="p-3 rounded-full bg-gray-100 hover:bg-indigo-600 hover:text-white transition-colors text-gray-700"
-                    title="再生"
+                    className={`p-3 rounded-full transition-colors ${playingId === item.id ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-gray-100 text-gray-700 hover:bg-indigo-600 hover:text-white'}`}
+                    title={playingId === item.id ? "停止" : "再生"}
                   >
-                    <Play size={20} fill={playingId === item.id ? "currentColor" : "none"} />
+                    {playingId === item.id ? <Square size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
                   </button>
                   <a
                     href={item.file_url}
